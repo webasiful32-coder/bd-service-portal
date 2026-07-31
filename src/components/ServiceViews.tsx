@@ -74,7 +74,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
   });
 
   // Special services parameters
-  const [genericPhone, setGenericPhone] = useState<string>('01307430464');
+  const [genericPhone, setGenericPhone] = useState<string>('');
   const [genericNIDText, setGenericNIDText] = useState<string>(generateRandomNID());
   const [genericIMEI, setGenericIMEI] = useState<string>('');
   const [activeMFSProvider, setActiveMFSProvider] = useState<'bKash' | 'Nagad' | 'Rocket'>('bKash');
@@ -93,7 +93,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
   // Device Simulation States
   const [lockState, setLockState] = useState<DeviceLockState>({
     phone: '', message: 'আপনার বিকাশ পেমেন্ট বকেয়া থাকায় মোবাইলটি লক করা হয়েছে। অবিলম্বে বকেয়া পরিশোধ করে বিকাশ নাম্বারে যোগাযোগ করুন।',
-    bkashNumber: '01307430464', amount: '5,000', isLockedSimulation: false
+    bkashNumber: '', amount: '5,000', isLockedSimulation: false
   });
 
   // Simple OTP Bypass state
@@ -109,42 +109,42 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
       case 'certificate':
       case 'cert':
         return [
-          { name: 'fullName', label: 'আবেদনকারীর নাম (Full Name)', type: 'text', required: true, placeholder: 'e.g. Asiful Islam' },
-          { name: 'fatherName', label: 'পিতার নাম (Father\'s Name)', type: 'text', required: true, placeholder: 'e.g. Mohammad Islam' },
-          { name: 'nidNo', label: 'জাতীয় পরিচয়পত্র নম্বর (NID)', type: 'text', required: true, placeholder: 'e.g. 5509XXXXXXXX' },
-          { name: 'mobile', label: 'মোবাইল নম্বর (Mobile Number)', type: 'text', required: true, placeholder: 'e.g. 017XXXXXXXX' },
-          { name: 'address', label: 'স্থায়ী ঠিকানা (Permanent Address)', type: 'textarea', required: true, placeholder: 'e.g. Uttara, Dhaka' },
-          { name: 'purpose', label: 'আবেদনের কারণ (Purpose)', type: 'text', required: false, placeholder: 'e.g. Passport or Job Application' }
+          { name: 'fullName', label: 'আবেদনকারীর নাম (Full Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'fatherName', label: 'পিতার নাম (Father\'s Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'nidNo', label: 'জাতীয় পরিচয়পত্র নম্বর (NID)', type: 'text', required: true, placeholder: '' },
+          { name: 'mobile', label: 'মোবাইল নম্বর (Mobile Number)', type: 'text', required: true, placeholder: '' },
+          { name: 'address', label: 'স্থায়ী ঠিকানা (Permanent Address)', type: 'textarea', required: true, placeholder: '' },
+          { name: 'purpose', label: 'আবেদনের কারণ (Purpose)', type: 'text', required: false, placeholder: '' }
         ];
       case 'land':
         return [
-          { name: 'ownerName', label: 'জমির মালিকের নাম (Owner Name)', type: 'text', required: true, placeholder: 'e.g. Asiful Islam' },
-          { name: 'khationNo', label: 'খতিয়ান নম্বর (Khation Ledger No)', type: 'text', required: true, placeholder: 'e.g. CS-9021' },
-          { name: 'dagNo', label: 'দাগ নম্বর (Plot Dag No)', type: 'text', required: true, placeholder: 'e.g. 439' },
-          { name: 'mouza', label: 'মৌজা ও জে এল নম্বর (Mouza & J.L No)', type: 'text', required: true, placeholder: 'e.g. Gazipur J.L. 12' },
-          { name: 'district', label: 'জেলা ও উপজেলা (District & Upazila)', type: 'text', required: true, placeholder: 'e.g. Dhaka, Uttara' }
+          { name: 'ownerName', label: 'জমির মালিকের নাম (Owner Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'khationNo', label: 'খতিয়ান নম্বর (Khation Ledger No)', type: 'text', required: true, placeholder: '' },
+          { name: 'dagNo', label: 'দাগ নম্বর (Plot Dag No)', type: 'text', required: true, placeholder: '' },
+          { name: 'mouza', label: 'মৌজা ও জে এল নম্বর (Mouza & J.L No)', type: 'text', required: true, placeholder: '' },
+          { name: 'district', label: 'জেলা ও উপজেলা (District & Upazila)', type: 'text', required: true, placeholder: '' }
         ];
       case 'education':
         return [
-          { name: 'studentName', label: 'শিক্ষার্থীর নাম (Student Name)', type: 'text', required: true, placeholder: 'e.g. Rafi Islam' },
-          { name: 'boardName', label: 'শিক্ষা বোর্ড (Board Name)', type: 'text', required: true, placeholder: 'e.g. Dhaka Board' },
-          { name: 'rollNo', label: 'রোল নম্বর (Exam Roll Number)', type: 'text', required: true, placeholder: 'e.g. 102914' },
-          { name: 'regNo', label: 'রেজিস্ট্রেশন নম্বর (Registration Number)', type: 'text', required: true, placeholder: 'e.g. 9931024' },
-          { name: 'examYear', label: 'পরীক্ষার বছর (Exam Year)', type: 'text', required: true, placeholder: 'e.g. 2024' }
+          { name: 'studentName', label: 'শিক্ষার্থীর নাম (Student Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'boardName', label: 'শিক্ষা বোর্ড (Board Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'rollNo', label: 'রোল নম্বর (Exam Roll Number)', type: 'text', required: true, placeholder: '' },
+          { name: 'regNo', label: 'রেজিস্ট্রেশন নম্বর (Registration Number)', type: 'text', required: true, placeholder: '' },
+          { name: 'examYear', label: 'পরীক্ষার বছর (Exam Year)', type: 'text', required: true, placeholder: '' }
         ];
       case 'trade':
         return [
-          { name: 'proprietorName', label: 'মালিক/প্রোপাইটারের নাম (Proprietor Name)', type: 'text', required: true, placeholder: 'e.g. Asiful Islam' },
-          { name: 'businessName', label: 'ব্যবসা প্রতিষ্ঠানের নাম (Business Trade Name)', type: 'text', required: true, placeholder: 'e.g. BD Digital Solutions' },
-          { name: 'businessAddress', label: 'ব্যবসার ঠিকানা (Business Address)', type: 'text', required: true, placeholder: 'e.g. Uttara Sector 3, Dhaka' },
-          { name: 'sectorType', label: 'ব্যবসার ধরন (Sector / Category)', type: 'text', required: true, placeholder: 'e.g. IT services, Agro, Retail' }
+          { name: 'proprietorName', label: 'মালিক/প্রোপাইটারের নাম (Proprietor Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'businessName', label: 'ব্যবসা প্রতিষ্ঠানের নাম (Business Trade Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'businessAddress', label: 'ব্যবসার ঠিকানা (Business Address)', type: 'text', required: true, placeholder: '' },
+          { name: 'sectorType', label: 'ব্যবসার ধরন (Sector / Category)', type: 'text', required: true, placeholder: '' }
         ];
       default:
         return [
-          { name: 'fullName', label: 'পূর্ণ নাম (Full Name)', type: 'text', required: true, placeholder: 'e.g. Asiful Islam' },
-          { name: 'phoneNo', label: 'মোবাইল নম্বর (Phone / NID)', type: 'text', required: true, placeholder: 'e.g. 017XXXXXXXX' },
-          { name: 'reference', label: 'রেফারেন্স / ট্র্যাকিং নম্বর (Reference Key)', type: 'text', required: true, placeholder: 'e.g. REF-2104' },
-          { name: 'notes', label: 'অতিরিক্ত বিবরণ ও মন্তব্য (Additional Notes)', type: 'textarea', required: false, placeholder: 'e.g. Please extract verify log context.' }
+          { name: 'fullName', label: 'পূর্ণ নাম (Full Name)', type: 'text', required: true, placeholder: '' },
+          { name: 'phoneNo', label: 'মোবাইল নম্বর (Phone / NID)', type: 'text', required: true, placeholder: '' },
+          { name: 'reference', label: 'রেফারেন্স / ট্র্যাকিং নম্বর (Reference Key)', type: 'text', required: true, placeholder: '' },
+          { name: 'notes', label: 'অতিরিক্ত বিবরণ ও মন্তব্য (Additional Notes)', type: 'textarea', required: false, placeholder: '' }
         ];
     }
   };
@@ -236,7 +236,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
         bloodGroup: '',
         birthPlace: '',
         address: '',
-        photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=60'
+        photoUrl: ''
       });
       triggerToast('Demo Data Instated', 'Smart ID visual fields updated.');
     }
@@ -657,7 +657,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
               <div>
                 <label className="text-xs font-bold text-gray-600 block mb-1">Enter National NID Number (এনআইডি কার্ড নম্বর)</label>
                 <input
-                  type="text" placeholder="e.g. 4920491823"
+                  type="text" placeholder=""
                   value={genericNIDText}
                   onChange={(e) => setGenericNIDText(e.target.value)}
                   className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-xs font-mono text-gray-800"
@@ -667,7 +667,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
               <div>
                 <label className="text-xs font-bold text-gray-600 block mb-1">Enter Birth Certificate ID (১৭ ডিজিট জন্ম নিবন্ধন)</label>
                 <input
-                  type="text" placeholder="e.g. 19958273910394019"
+                  type="text" placeholder=""
                   className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-xs font-mono text-gray-800"
                 />
               </div>
@@ -871,7 +871,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
             <div>
               <label className="text-xs font-bold text-gray-600 block mb-1">Enter National NID Code (১২ বা ১৭ ডিজিট)</label>
               <input
-                type="text" placeholder="e.g. 4921049214902"
+                type="text" placeholder=""
                 className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-xs font-mono"
               />
             </div>
@@ -1209,7 +1209,7 @@ export default function ServiceViews({ activeServiceId, walletBalance, deductFee
             <div>
               <label className="text-xs font-bold text-gray-600 block mb-1">Birth Certificate Registration No (১৭ ডিজিট জন্ম নিবন্ধন)</label>
               <input
-                type="text" required placeholder="e.g. 19958291038102948"
+                type="text" required placeholder=""
                 value={otpBypassState.birthRegNo}
                 onChange={(e) => setOtpBypassState(prev => ({ ...prev, birthRegNo: e.target.value }))}
                 className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-xs font-mono text-gray-800"
