@@ -52,8 +52,8 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
 
   // Merchants numbers simulation
   const MERCHANT_NUMBERS = {
-    bKash: '01775968585',
-    Nagad: '01307430464',
+    bKash: '01628329062',
+    Nagad: '01628329062',
   };
 
   // Get brand color theme
