@@ -52,7 +52,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
 
   // Merchants numbers simulation
   const MERCHANT_NUMBERS = {
-    bKash: '01615709084',
+    bKash: 'বিকাশ লেনদেন সাময়িকভাবে বন্ধ',
     Nagad: '01628329062',
   };
 
