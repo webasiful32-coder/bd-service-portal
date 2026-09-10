@@ -19,15 +19,18 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
+export type PaymentMethod = 'bKash' | 'Nagad';
+
 interface WalletGateProps {
   balance: number;
   transactions: Transaction[];
   onAddMoney: (amount: number, method: 'bKash' | 'Nagad' , trxId: string, senderNumber: string) => void;
   onWithdraw: (amount: number, method: 'bKash' | 'Nagad' , accountNo: string) => boolean | Promise<boolean>;
+  onResetBalance?: () => void;
   onBack?: () => void;
 }
 
-export default function WalletGate({ balance, transactions, onAddMoney, onWithdraw, onBack }: WalletGateProps) {
+export default function WalletGate({ balance, transactions, onAddMoney, onWithdraw, onResetBalance, onBack }: WalletGateProps) {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   
   // Deposit States
@@ -81,7 +84,17 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
           badgeDot: 'bg-[#f7941d]',
           glow: 'shadow-[0_4px_14px_rgba(247,148,29,0.12)]'
         };
-   
+      default:
+        return {
+          primary: '#e2136e',
+          pastelBg: 'bg-[#e2136e]/5',
+          primaryBg: 'bg-[#e2136e]',
+          borderActive: 'border-[#e2136e]',
+          textActive: 'text-[#e2136e]',
+          ring: 'focus:ring-[#e2136e]/10',
+          badgeDot: 'bg-[#e2136e]',
+          glow: 'shadow-[0_4px_14px_rgba(226,19,110,0.12)]'
+        };
     }
   };
 
@@ -92,15 +105,6 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
     navigator.clipboard.writeText(num.split(' ')[0]);
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 2000);
-  };
-
-  const generateMockTrxId = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = 'TXN';
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setTrxId(result);
   };
 
   const handleDepositSubmit = (e: React.FormEvent) => {
@@ -125,7 +129,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
     }
 
     if (!trxId.trim()) {
-      alert('Please enter a Transaction ID (or click "Mock Sandbox ID" to auto-simulate)');
+      setDepositError('অনুগ্রহ করে পেমেন্ট সম্পন্ন করার পর প্রাপ্ত আসল Transaction ID (ট্রানজেকশন আইডি) লিখুন।');
       return;
     }
 
@@ -202,9 +206,9 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
             id="wallet_back_btn"
             type="button"
             onClick={onBack}
-            className="flex items-center gap-2 text-purple-750 hover:text-purple-950 text-xs font-black transition-colors cursor-pointer group"
+            className="flex items-center gap-2 text-purple-700 hover:text-purple-950 text-xs font-black transition-colors cursor-pointer group"
           >
-            <ArrowLeft size={15} className="stroke-[2.5] group-hover:-translate-x-1 transition-transform text-purple-750" />
+            <ArrowLeft size={15} className="stroke-[2.5] group-hover:-translate-x-1 transition-transform text-purple-700" />
             <span>ফিরে যান (Back to Services)</span>
           </button>
           
@@ -224,18 +228,28 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-3 max-w-2xl">
-              <p className="text-[11px] uppercase tracking-[0.26em] text-violet-200 font-black">সাব এডমিন হওয়ার সুযোগ!</p>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">আমাদের একাউন্টে সাব অ্যাডমিন নিতে চাইলে মাত্র</h2>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.24em] text-white shadow-sm">
-                <Sparkles size={14} className="text-amber-200" />
-                <span>সাব এডমিন</span>
+              <p className="text-[11px] uppercase tracking-[0.26em] text-violet-200 font-black">ডিজিটাল সেবা ওয়ালেট</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">আপনার ডিজিটাল ওয়ালেট ব্যালেন্স</h2>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white shadow-sm">
+                <ShieldCheck size={14} className="text-emerald-300" />
+                <span>অফিসিয়াল সক্রিয় ওয়ালেট</span>
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-white/15 bg-white/10 px-5 py-4 shadow-lg backdrop-blur-sm text-right">
-              <p className="text-[10px] uppercase tracking-[0.24em] text-violet-200 font-black">২,৯৫০ ৳</p>
-              <p className="mt-3 text-4xl font-extrabold">৳ ২,৯৫০</p>
-              <p className="mt-2 text-xs text-violet-100/90">এবার যোগ করুন — সারাদেশীয় সুবিধা উপভোগ করুন</p>
+            <div className="rounded-[2rem] border border-white/15 bg-white/10 px-6 py-4 shadow-lg backdrop-blur-sm text-right">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-violet-200 font-black">বর্তমান ওয়ালেট ব্যালেন্স</p>
+              <p className="mt-2 text-3xl sm:text-4xl font-extrabold">৳ {balance.toFixed(2)}</p>
+              <p className="mt-1 text-xs text-violet-100/90">প্রকৃত ক্যাশ ব্যালেন্স</p>
+              {onResetBalance && balance > 0 && (
+                <button
+                  type="button"
+                  onClick={onResetBalance}
+                  className="mt-2 text-[11px] text-rose-200 hover:text-white bg-rose-500/30 hover:bg-rose-500/50 px-3 py-1 rounded-full border border-rose-300/30 transition-all font-semibold cursor-pointer inline-flex items-center gap-1"
+                >
+                  <RotateCw size={11} />
+                  <span>ব্যালেন্স ০ ৳ করুন</span>
+                </button>
+              )}
             </div>
           </div>
             
@@ -288,9 +302,9 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 w-full sm:w-auto">
                   <div className="rounded-[1.75rem] bg-purple-50 border border-purple-100 p-4 text-purple-950 shadow-sm min-w-[220px]">
-                    <div className="text-[10px] uppercase tracking-[0.24em] font-black text-purple-500">{depositAccountType === 'Personal' ? 'Personal Account' : 'Business Account'}</div>
-                    <div className="mt-3 text-3xl font-extrabold">৳ {depositAccountType === 'Personal' ? '৫০০' : '১,৪৫০'}</div>
-                    <p className="mt-2 text-[11px] text-purple-600">{depositAccountType === 'Personal' ? 'Personal অ্যাকাউন্টের জন্য প্রস্তাবিত টাকা।' : 'Business অ্যাকাউন্টের জন্য ন্যূনতম জমা।'}</p>
+                    <div className="text-[10px] uppercase tracking-[0.24em] font-black text-purple-500">রিচার্জের পরিমাণ</div>
+                    <div className="mt-3 text-3xl font-extrabold">৳ {depositAmount || '0'}</div>
+                    <p className="mt-2 text-[11px] text-purple-600">bKash/Nagad মাধ্যমে জমা করার পরিমাণ</p>
                   </div>
                   
                 </div>
@@ -311,7 +325,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                       }
                       setDepositError('');
                     }}
-                    className={`py-3 rounded-2xl transition-all duration-200 text-sm font-black ${isActive ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'bg-white text-purple-800 border border-purple-100 hover:border-purple-200'}`}
+                    className={`py-3 rounded-2xl transition-all duration-200 text-sm font-black cursor-pointer ${isActive ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'bg-white text-purple-800 border border-purple-100 hover:border-purple-200'}`}
                   >
                     {type} Account
                   </button>
@@ -354,7 +368,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                   1. Select Payment Method / অপারেটর সিলেক্ট করুন
                 </label>
                 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                   {(['bKash', 'Nagad'] as const).map((method) => {
                     const isSelected = depositMethod === method;
                     const bTheme = getBrandDetails(method);
@@ -463,7 +477,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                   </div>
                 </div>
 
-                {/* TrxID Field with dynamic copy mock ID */}
+                {/* TrxID Field */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-extrabold text-purple-950/80 tracking-widest block pl-1 uppercase">
                     Transaction ID / ট্রানজেকশন ID
@@ -473,21 +487,13 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                       id="input_deposit_trxid"
                       type="text"
                       required
-                      placeholder="e.g. TRX893JVU3"
+                      placeholder="যেমন: TRX893JVU3"
                       value={trxId}
                       onChange={(e) => setTrxId(e.target.value)}
-                      className="w-full bg-purple-50/10 border border-purple-100 hover:border-purple-300 focus:border-purple-500 rounded-xl py-3 pl-4 pr-24 text-xs font-mono uppercase font-black text-purple-950 focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all"
+                      className="w-full bg-purple-50/10 border border-purple-100 hover:border-purple-300 focus:border-purple-500 rounded-xl py-3 px-4 text-xs font-mono uppercase font-black text-purple-950 focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all"
                     />
-                    <button
-                      type="button"
-                      onClick={generateMockTrxId}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-50 hover:bg-purple-100 active:scale-95 text-purple-750 text-[10px] px-2.5 py-1.5 rounded-lg border border-purple-200/40 font-black transition-all cursor-pointer shadow-xs"
-                      title="Simulate automated test payload"
-                    >
-                      Mock Sandbox
-                    </button>
                   </div>
-                  <span className="text-[9px] text-purple-400 font-medium pl-1 block">Specify your mobile wallet transaction proof</span>
+                  <span className="text-[9px] text-purple-400 font-medium pl-1 block">বিকাশ বা নগদ থেকে পেমেন্ট সফল হওয়ার পর পাওয়া ট্রানজেকশন আইডি লিখুন</span>
                 </div>
               </div>
 
@@ -542,7 +548,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                 <label className="text-[10px] font-extrabold text-purple-950/80 tracking-widest uppercase block pl-1">
                   1. Choose Payout Channel / উইথড্র মেথড সিলেক্ট করুন
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                   {(['bKash', 'Nagad'] as const).map((method) => {
                     const isSelected = withdrawMethod === method;
                     const bTheme = getBrandDetails(method);
@@ -577,7 +583,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                       id="input_withdraw_account"
                       type="tel"
                       required
-                      placeholder=""
+                      placeholder="01XXXXXXXXX"
                       value={accountNo}
                       onChange={(e) => setAccountNo(e.target.value)}
                       className="w-full bg-purple-50/10 border border-purple-100 hover:border-purple-300 focus:border-purple-500 text-purple-950 font-extrabold rounded-xl py-3 px-4 text-xs focus:outline-none focus:ring-4 focus:ring-purple-100 font-mono transition-all"
@@ -673,7 +679,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                           <p className="text-purple-950 font-black text-[12px] leading-snug">
                             {isDeposit ? `${tx.method} Deposit loaded` :
                              isWithdraw ? `MFS Payout to ${tx.method}` :
-                             `Service Charge: ${tx.serviceName}`}
+                             `Service Charge: ${tx.serviceName || 'Citizenship Query'}`}
                           </p>
                           <p className="text-[10px] text-purple-500 font-mono mt-1">
                             {tx.timestamp} {tx.trxId ? `• ID: ${tx.trxId}` : tx.accountNo ? `• Ref: ${tx.accountNo}` : ''}
@@ -686,7 +692,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                           isDeposit ? 'text-emerald-600' :
                           isWithdraw ? 'text-rose-600' : 'text-purple-900/80'
                         }`}>
-                          {isDeposit ? '+' : '-'} ৳{tx.amount.toFixed(1)}
+                          {isDeposit ? '+' : '-'} ৳{(tx.amount || 0).toFixed(1)}
                         </p>
                         
                         <span className={`inline-flex items-center gap-1.5 text-[8px] font-extrabold tracking-widest uppercase px-2 py-1 rounded-full mt-2 border ${

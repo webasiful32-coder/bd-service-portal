@@ -1,14 +1,21 @@
-export interface Transaction {
-  id: string;
-  type: 'deposit' | 'withdraw' | 'service';
-  serviceName?: string;
-  amount: number;
-  method: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'System';
-  trxId?: string;
-  accountNo?: string;
-  status: 'Completed' | 'Pending' | 'Rejected';
-  timestamp: string;
-}
+export type ServiceCategory = 
+  | 'all'
+  | 'nid'
+  | 'birth'
+  | 'birth_death'
+  | 'tax'
+  | 'tax_tin'
+  | 'mobile'
+  | 'telecom'
+  | 'location'
+  | 'cert'
+  | 'certificate'
+  | 'land'
+  | 'education'
+  | 'trade'
+  | 'other'
+  | 'others'
+  | (string & {});
 
 export type ServiceType = string;
 
@@ -19,13 +26,30 @@ export interface ServiceDefinition {
   category: string;
   description: string;
   fee: number;
-  icon: string;
+  icon?: string;
+  iconName?: string;
   color?: string;
   titleEn?: string;
   popular?: boolean;
   inputLabel?: string;
   inputPlaceholder?: string;
+  placeholder?: string;
   price?: number;
+  [key: string]: any;
+}
+
+export type ServiceItem = ServiceDefinition;
+
+export interface Transaction {
+  id: string;
+  type: 'deposit' | 'withdraw' | 'service';
+  serviceName?: string;
+  amount: number;
+  method?: 'bKash' | 'Nagad' | 'Rocket' | 'Upay' | 'System' | string;
+  trxId?: string;
+  accountNo?: string;
+  status: 'Completed' | 'Pending' | 'Rejected' | string;
+  timestamp: string;
 }
 
 export interface BirthCertificateInput {
@@ -140,3 +164,31 @@ export interface MarriageCertInput {
   kaziOfficeName: string;
 }
 
+export interface OrderItem {
+  id: string;
+  serviceId: string;
+  serviceTitle: string;
+  serviceBanglaTitle: string;
+  info: string;
+  fee: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  createdAt: string;
+  completedAt?: string;
+  deliveryNote?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: 'debit' | 'credit';
+  amount: number;
+  description: string;
+  timestamp: string;
+  method?: string;
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+  balance: number;
+}
