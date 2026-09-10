@@ -34,9 +34,9 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   
   // Deposit States
-  const [depositAmount, setDepositAmount] = useState<string>('500');
+  const [depositAmount, setDepositAmount] = useState<string>('550');
   const [depositMethod, setDepositMethod] = useState<'bKash' | 'Nagad'>('bKash');
-  const [depositAccountType, setDepositAccountType] = useState<'Personal' | 'Business'>('Personal');
+  const [depositAccountType, setDepositAccountType] = useState<'Personal' | 'Business' | 'Sub Admin'>('Personal');
   const [senderNumber, setSenderNumber] = useState<string>('');
   const [trxId, setTrxId] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -123,8 +123,18 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
       return;
     }
 
-    if (depositAccountType === 'Business' && amountNum < 1450) {
-      setDepositError('Business অ্যাকাউন্টের জন্য সর্বনিম্ন ১,৪৫০ টাকা দিতে হবে।');
+    if (depositAccountType === 'Personal' && amountNum < 550) {
+      setDepositError('Personal অ্যাকাউন্টের জন্য সর্বনিম্ন ৫৫০ টাকা দিতে হবে।');
+      return;
+    }
+
+    if (depositAccountType === 'Business' && amountNum < 1550) {
+      setDepositError('Business অ্যাকাউন্টের জন্য সর্বনিম্ন ১,৫৫০ টাকা দিতে হবে।');
+      return;
+    }
+
+    if (depositAccountType === 'Sub Admin' && amountNum < 3050) {
+      setDepositError('Sub Admin অ্যাকাউন্টের জন্য সর্বনিম্ন ৩,০৫০ টাকা দিতে হবে।');
       return;
     }
 
@@ -311,8 +321,8 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[11px] sm:text-[12px] font-bold">
-              {(['Personal', 'Business'] as const).map((type) => {
+            <div className="grid grid-cols-3 gap-2 text-[11px] sm:text-[12px] font-bold">
+              {(['Personal', 'Business', 'Sub Admin'] as const).map((type) => {
                 const isActive = depositAccountType === type;
                 return (
                   <button
@@ -320,24 +330,46 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                     type="button"
                     onClick={() => {
                       setDepositAccountType(type);
-                      if (type === 'Business' && parseFloat(depositAmount) < 1450) {
-                        setDepositAmount('1450');
+                      if (type === 'Personal' && parseFloat(depositAmount) < 550) {
+                        setDepositAmount('550');
+                      } else if (type === 'Business' && parseFloat(depositAmount) < 1550) {
+                        setDepositAmount('1550');
+                      } else if (type === 'Sub Admin' && parseFloat(depositAmount) < 3050) {
+                        setDepositAmount('3050');
                       }
                       setDepositError('');
                     }}
-                    className={`py-3 rounded-2xl transition-all duration-200 text-sm font-black cursor-pointer ${isActive ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'bg-white text-purple-800 border border-purple-100 hover:border-purple-200'}`}
+                    className={`py-3 px-2 rounded-2xl transition-all duration-200 text-xs sm:text-sm font-black cursor-pointer text-center ${isActive ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'bg-white text-purple-800 border border-purple-100 hover:border-purple-200'}`}
                   >
-                    {type} Account
+                    {type}
                   </button>
                 );
               })}
             </div>
 
+            {depositAccountType === 'Personal' && (
+              <div className="rounded-3xl border border-purple-200 bg-purple-50/80 p-4 text-[11px] sm:text-xs text-purple-950 shadow-sm">
+                <div className="font-black text-xs uppercase tracking-[0.18em] mb-1 text-purple-700">Personal Account Requirement</div>
+                <p className="leading-relaxed">
+                  Personal অ্যাকাউন্টের জন্য সর্বনিম্ন <strong className="text-purple-900 font-bold">৫৫০ টাকা</strong> অ্যাড করতে হবে।
+                </p>
+              </div>
+            )}
+
             {depositAccountType === 'Business' && (
               <div className="rounded-3xl border border-amber-200 bg-amber-50/80 p-4 text-[11px] sm:text-xs text-amber-900 shadow-sm">
-                <div className="font-black text-xs uppercase tracking-[0.18em] mb-1">Business Account Minimum</div>
+                <div className="font-black text-xs uppercase tracking-[0.18em] mb-1">Business Account Requirement</div>
                 <p className="leading-relaxed">
-                  Business অ্যাকাউন্টের জন্য সর্বনিম্ন <strong className="text-amber-800">১,৪৫০ টাকা</strong> অ্যাড করতে হবে। ১,৪৫০ টাকার কম পরিমাণ দিলে সাবমিশন গ্রহণ করা হবে না।
+                  Business অ্যাকাউন্টের জন্য সর্বনিম্ন <strong className="text-amber-800 font-bold">১,৫৫০ টাকা</strong> অ্যাড করতে হবে। ১,৫৫০ টাকার কম পরিমাণ দিলে সাবমিশন গ্রহণ করা হবে না।
+                </p>
+              </div>
+            )}
+
+            {depositAccountType === 'Sub Admin' && (
+              <div className="rounded-3xl border border-indigo-200 bg-indigo-50/80 p-4 text-[11px] sm:text-xs text-indigo-950 shadow-sm">
+                <div className="font-black text-xs uppercase tracking-[0.18em] mb-1 text-indigo-700">Sub Admin Account Requirement</div>
+                <p className="leading-relaxed">
+                  Sub Admin অ্যাকাউন্টের জন্য সর্বনিম্ন <strong className="text-indigo-900 font-bold">৩,০৫০ টাকা</strong> অ্যাড করতে হবে। ৩,০৫০ টাকার কম পরিমাণ দিলে সাবমিশন গ্রহণ করা হবে না।
                 </p>
               </div>
             )}
