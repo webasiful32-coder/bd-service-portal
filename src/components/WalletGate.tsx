@@ -330,11 +330,11 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                     type="button"
                     onClick={() => {
                       setDepositAccountType(type);
-                      if (type === 'Personal' && parseFloat(depositAmount) < 550) {
+                      if (type === 'Personal') {
                         setDepositAmount('550');
-                      } else if (type === 'Business' && parseFloat(depositAmount) < 1550) {
+                      } else if (type === 'Business') {
                         setDepositAmount('1550');
-                      } else if (type === 'Sub Admin' && parseFloat(depositAmount) < 3050) {
+                      } else if (type === 'Sub Admin') {
                         setDepositAmount('3050');
                       }
                       setDepositError('');
@@ -474,7 +474,7 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                         id="input_deposit_amount"
                         type="number"
                         required
-                        min={depositAccountType === 'Business' ? 1450 : 50}
+                        min={depositAccountType === 'Sub Admin' ? 3050 : depositAccountType === 'Business' ? 1550 : 550}
                         max="25000"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
@@ -482,9 +482,11 @@ export default function WalletGate({ balance, transactions, onAddMoney, onWithdr
                       />
                     </div>
                     <span className="text-[9px] text-purple-400 font-medium pl-1 block">
-                      {depositAccountType === 'Business'
-                        ? 'Business অ্যাকাউন্টের জন্য সর্বনিম্ন ১,৪৫০ টাকা বাধ্যতামূলক'
-                        : 'Min 50 ৳, Max 25,000 ৳ per entry'}
+                      {depositAccountType === 'Sub Admin'
+                        ? 'Sub Admin অ্যাকাউন্টের জন্য সর্বনিম্ন ৩,০৫০ টাকা বাধ্যতামূলক'
+                        : depositAccountType === 'Business'
+                        ? 'Business অ্যাকাউন্টের জন্য সর্বনিম্ন ১,৫৫০ টাকা বাধ্যতামূলক'
+                        : 'Personal অ্যাকাউন্টের জন্য সর্বনিম্ন ৫৫০ টাকা বাধ্যতামূলক'}
                     </span>
                   </div>
 
