@@ -3,11 +3,12 @@ import { Transaction, ServiceType, ServiceDefinition } from './types';
 import { SYSTEM_SERVICES, OFFICIAL_GOVT_SEAL } from './data';
 import WalletGateComponent, { WalletGate as NamedWalletGate, PaymentMethod } from './components/WalletGate';
 import ServiceViews from './components/ServiceViews';
+import { AuthScreen } from './components/AuthScreen';
 import { localAuth, LocalUser } from './lib/localAuth';
 import { 
   Search, CreditCard, CheckCircle, Sparkles, Clock, 
   Layers, ShieldCheck, LogOut, Smartphone,
-  Wallet, ArrowRight, AlertTriangle
+  Wallet, ArrowRight, AlertTriangle, UserCheck, LogIn, X
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
 
@@ -16,15 +17,23 @@ const WalletGate = WalletGateComponent || NamedWalletGate;
 
 const brandLogo = OFFICIAL_GOVT_SEAL || "https://upload.wikimedia.org/wikipedia/commons/8/84/Government_Seal_of_Bangladesh.svg";
 
+// অফিসিয়াল WhatsApp লিংক
+const WHATSAPP_LINK = "https://wa.me/message/5GS3DHNNX6PSM1";
+
 export default function App() {
-  // লগইন স্ক্রিন ছাড়া সরাসরি ড্যাশবোর্ড ওপেন করার জন্য ডিফল্ট সিটিজেন স্টেট
-  const [currentUser, setCurrentUser] = useState<LocalUser>(() => {
-    return localAuth.getCurrentUser() || {
+  // ড্যাশবোর্ডে সরাসরি প্রবেশের জন্য ইউজার স্টেট (রেজিস্টার্ড কি না তা চেনার জন্য isGuest ফ্ল্যাগ)
+  const [currentUser, setCurrentUser] = useState<LocalUser & { isGuest?: boolean }>(() => {
+    const active = localAuth.getCurrentUser();
+    if (active) {
+      return { ...active, isGuest: false };
+    }
+    return {
       uid: 'CITIZEN-' + Math.floor(100000 + Math.random() * 900000),
       email: 'citizen@service.gov.bd',
       displayName: 'সাধারণ নাগরিক (গেস্ট)',
       balance: 0,
-      role: 'citizen'
+      role: 'citizen',
+      isGuest: true
     };
   });
 
@@ -39,6 +48,9 @@ export default function App() {
   const [activeServiceId, setActiveServiceId] = useState<ServiceType | null>(null);
   const [isWalletViewActive, setIsWalletViewActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // রেজিস্ট্রেশন / লগইন মোডাল স্টেট
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Toast State & Notice
   const [toast, setToast] = useState<{ title: string; message: string; show: boolean } | null>(null);
@@ -197,7 +209,7 @@ export default function App() {
         await localAuth.checkDatabaseStatus();
         const user = localAuth.getCurrentUser();
         if (user) {
-          setCurrentUser(user);
+          setCurrentUser({ ...user, isGuest: false });
           if (typeof user.balance === 'number') {
             setBalance(user.balance);
           }
@@ -218,15 +230,25 @@ export default function App() {
     }, 4500);
   };
 
-  // সার্ভিস কার্ডে ক্লিক করার সময় ব্যালেন্স চেক ও অ্যালার্ট
+  // সার্ভিস কার্ডে ক্লিক করার সময় রেজিস্ট্রেশন ও ব্যালেন্স চেক
   const handleServiceClick = (serviceItem: ServiceDefinition) => {
+    // ১. যদি ইউজার গেস্ট থাকে, তাহলে আগে রেজিস্ট্রেশন করতে বলা হবে
+    if (currentUser.isGuest) {
+      triggerToast(
+        '🔒 একাউন্ট রেজিস্ট্রেশন প্রয়োজন',
+        `"${serviceItem.banglaTitle || serviceItem.title}" সেবাটি গ্রহণ করতে অনুগ্রহ করে প্রথমে রেজিস্ট্রেশন করুন।`
+      );
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    // ২. ব্যালেন্স চেক
     const fee = serviceItem.fee ?? (serviceItem as any).price ?? 18;
     if (balance < fee) {
       triggerToast(
         '⚠️ ব্যালেন্স রিচার্জ প্রয়োজন',
         `"${serviceItem.banglaTitle || serviceItem.title}" সেবার জন্য ৳ ${fee} প্রয়োজন। আপনার বর্তমান ব্যালেন্স ৳ ${balance.toFixed(1)}। অনুগ্রহ করে বিকাশ বা নগদে টাকা অ্যাড করুন।`
       );
-      // ব্যালেন্স না থাকলে সরাসরি রিচার্জ ডেস্ক ওপেন করা
       setIsWalletViewActive(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -345,6 +367,23 @@ export default function App() {
     return true;
   };
 
+  // Auth Success Callback
+  const handleAuthSuccess = (user: any) => {
+    setCurrentUser({
+      uid: user.uid || 'USR-' + Math.floor(100000 + Math.random() * 900000),
+      email: user.email,
+      displayName: user.displayName || user.name || user.email,
+      balance: typeof user.balance === 'number' ? user.balance : balance,
+      role: user.role || 'citizen',
+      isGuest: false
+    });
+    if (typeof user.balance === 'number') {
+      setBalance(user.balance);
+    }
+    setIsAuthModalOpen(false);
+    triggerToast('স্বাগতম', `${user.displayName || user.name || user.email}, আপনার একাউন্ট সফলভাবে সক্রিয় হয়েছে!`);
+  };
+
   // Filter Services Logic
   const filteredServices = SYSTEM_SERVICES.filter(service => {
     const q = searchQuery.toLowerCase();
@@ -403,18 +442,40 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER DESK NAVIGATION BAR */}
+      {/* 🔐 AUTH MODAL POPUP (রেজিস্ট্রেশন ও লগইন উইন্ডো) */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-md">
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-slate-900 text-white hover:bg-slate-800 flex items-center justify-center shadow-lg cursor-pointer border-2 border-white transition"
+              title="বন্ধ করুন"
+            >
+              <X size={16} />
+            </button>
+            <AuthScreen
+              onSuccess={handleAuthSuccess}
+              onAuthSuccess={handleAuthSuccess}
+              triggerToast={triggerToast}
+              onCancel={() => setIsAuthModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* HEADER DESK NAVIGATION BAR (Matching Screenshot 2 with WhatsApp Button) */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row justify-between items-center gap-3.5">
           
           {/* Logo and National branding */}
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-3.5 items-center">
             <div className="p-1 bg-white rounded-xl transition-all hover:scale-105 duration-300">
               <div className="relative">
                 <img 
                   src={brandLogo} 
                   alt="নাগরিক সেবা" 
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-emerald-500 bg-white p-1 hover:scale-105 transition-transform duration-300 cursor-pointer object-contain"
+                  className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl border border-emerald-500 bg-white p-1 hover:scale-105 transition-transform duration-300 cursor-pointer object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
@@ -424,7 +485,7 @@ export default function App() {
                 <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">National Network</span>
                 <span className="text-[9px] uppercase tracking-widest font-mono text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Gov Cloud v2.4</span>
               </div>
-              <h1 className="text-base sm:text-lg font-black font-sans text-slate-900 tracking-tight leading-none mt-1.5 flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black font-sans text-slate-900 tracking-tight leading-none mt-1 flex items-center gap-2">
                 BD Service Portal 
                 <span className="text-xs sm:text-sm font-bold text-slate-400 font-sans">
                   | বিডি সেবা পোর্টাল
@@ -433,10 +494,10 @@ export default function App() {
             </div>
           </div>
  
-          {/* Clock widget + Active Wallet balance block */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Status + Clock + WhatsApp Button + Wallet Desk + Auth Controls */}
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2.5 sm:gap-3">
             {/* Database status pill */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/60 text-[10px] font-bold font-sans text-slate-700">
+            <div className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/60 text-[10px] font-bold font-sans text-slate-700">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
@@ -445,21 +506,51 @@ export default function App() {
             </div>
  
             {/* Live Clock */}
-            <div className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-200/60 text-[10px] text-slate-600 font-bold font-mono">
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-200/60 text-[10px] text-slate-600 font-bold font-mono">
               <Clock size={11} className="text-slate-400" />
               <span>{currentTime.toLocaleTimeString()}</span>
             </div>
+
+            {/* 🟢 HEADER WHATSAPP BUTTON (Matching Screenshot 1 & 2) */}
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#00c853] hover:bg-[#00b34a] active:scale-95 text-white font-bold text-xs rounded-full shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 transition-all duration-300 cursor-pointer shrink-0"
+              style={{ textDecoration: 'none' }}
+              title="WhatsApp এ সরাসরি মেসেজ দিন"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="currentColor" 
+                className="text-white group-hover:rotate-12 transition-transform duration-300 shrink-0"
+              >
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.88-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.347-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.876 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+              </svg>
+              <span>WhatsApp এ মেসেজ দিন</span>
+            </a>
  
-            {/* Wallet Panel Buttons */}
+            {/* 💳 Wallet Desk Button */}
             <div className="flex items-center gap-2">
               <button
                 id="wallet_access_btn"
                 type="button"
                 onClick={() => {
+                  if (currentUser.isGuest) {
+                    triggerToast(
+                      '🔒 একাউন্ট রেজিস্ট্রেশন প্রয়োজন',
+                      'ব্যালেন্স রিচার্জ ও নিরাপদ লেনদেনের জন্য অনুগ্রহ করে প্রথমে একাউন্ট রেজিস্ট্রেশন করুন।'
+                    );
+                    setIsAuthModalOpen(true);
+                    return;
+                  }
                   setIsWalletViewActive(!isWalletViewActive);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="group flex items-center gap-3 bg-[#1e293b] hover:bg-[#0f172a] active:bg-[#020617] text-white border border-[#334155] p-1.5 pr-4 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer text-xs font-semibold shadow-sm"
+                className="group flex items-center gap-2.5 bg-[#1e293b] hover:bg-[#0f172a] active:bg-[#020617] text-white border border-[#334155] p-1.5 pr-4 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer text-xs font-semibold shadow-sm"
               >
                 <div className="p-1 px-2.5 bg-[#334155] group-hover:bg-[#475569] rounded-lg text-amber-400 font-bold font-sans flex items-center gap-1.5 transition-all">
                   <CreditCard size={13} className="text-amber-300 group-hover:scale-110 transition-transform" />
@@ -470,6 +561,56 @@ export default function App() {
                 </span>
               </button>
             </div>
+
+            {/* 👤 Registration & Login Controls */}
+            {currentUser.isGuest ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                >
+                  <UserCheck size={14} className="text-amber-300" />
+                  <span>রেজিস্ট্রেশন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  <LogIn size={13} className="text-purple-600" />
+                  <span>লগইন</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-xs font-bold text-purple-950 truncate max-w-[120px]">
+                  {currentUser.displayName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localAuth.logout();
+                    setCurrentUser({
+                      uid: 'CITIZEN-' + Math.floor(100000 + Math.random() * 900000),
+                      email: 'citizen@service.gov.bd',
+                      displayName: 'সাধারণ নাগরিক (গেস্ট)',
+                      balance: 0,
+                      role: 'citizen',
+                      isGuest: true
+                    });
+                    setBalance(0);
+                    localStorage.removeItem('citizen_wallet_balance');
+                    triggerToast('লগআউট সম্পন্ন', 'আপনি সফলভাবে লগআউট হয়েছেন।');
+                  }}
+                  className="p-1 hover:bg-purple-100 rounded-lg text-slate-400 hover:text-rose-600 transition"
+                  title="লগআউট করুন"
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            )}
           </div>
           
         </div>
@@ -541,12 +682,23 @@ export default function App() {
                       বিল্ড করুন কাস্টম জন্ম নিবন্ধন রেকর্ড ও SMART আইডি যাচাইকরণ স্লিপ, সিম বায়োমেট্রিক ও মালিকানা রেকর্ড ডিটেইলস সহ উন্নত লোকেশন ও ডিভাইস সিকিউরিটি ট্র্যাকিং মডিউল।
                     </p>
                     
-                    {/* Dynamic Greeting */}
+                    {/* Dynamic Greeting & Registration Callout */}
                     <div className="flex flex-wrap items-center gap-3 pt-2">
                       <div className="flex items-center gap-2 bg-gradient-to-r from-sky-500/20 to-indigo-500/20 hover:from-sky-500/30 hover:to-indigo-500/30 border border-sky-500/30 py-1.5 px-3.5 rounded-xl text-xs text-sky-200 transition-all duration-300 shadow-sm backdrop-blur-md">
                         <Sparkles size={13} className="text-amber-300" />
-                        <span>সেবাগ্রহীতা: <strong className="text-white font-bold">{currentUser.displayName || currentUser.email}</strong></span>
+                        <span>সেবাগ্রহীতা: <strong className="text-white font-bold">{currentUser.displayName}</strong></span>
                       </div>
+
+                      {currentUser.isGuest && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAuthModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-md transition cursor-pointer"
+                        >
+                          <UserCheck size={13} />
+                          <span>একাউন্ট রেজিস্ট্রেশন করুন →</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -593,7 +745,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 📢 জরুরি নোটিশ / ইউজারদের ব্যালেন্স অ্যাড নির্দেশিকা */}
+              {/* 📢 জরুরি নোটিশ / রেজিস্ট্রেশন ও ব্যালেন্স গাইড ব্যানার */}
               {showNoticeBanner && (
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-emerald-500/15 border-2 border-amber-400 p-4 sm:p-5 shadow-md">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -604,25 +756,27 @@ export default function App() {
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-xs">
-                            জরুরি নোটিশ / ব্যালেন্স নির্দেশনা
+                            {currentUser.isGuest ? 'রেজিস্ট্রেশন ও ব্যালেন্স গাইড' : 'ব্যালেন্স নির্দেশনা'}
                           </span>
                           <span className="text-xs sm:text-sm font-bold text-slate-900">
-                            যেকোনো সেবা গ্রহণ করতে প্রথমে একাউন্টে ব্যালেন্স অ্যাড করুন
+                            {currentUser.isGuest 
+                              ? 'সেবা গ্রহণ করতে প্রথমে বিনামূল্যে রেজিস্ট্রেশন ও ব্যালেন্স রিচার্জ করুন' 
+                              : 'যেকোনো সেবা গ্রহণ করতে আপনার ওয়ালেটে ব্যালেন্স রিচার্জ করুন'}
                           </span>
                         </div>
                         <p className="text-xs sm:text-[13px] text-slate-700 mt-1.5 leading-relaxed font-medium max-w-3xl">
-                          সার্ভার কপি, জন্ম নিবন্ধন, স্মার্ট আইডি, সিম ভেরিফিকেশন সহ যেকোনো ডিজিটাল সেবা পেতে আপনার ওয়ালেটে প্রয়োজনীয় ব্যালেন্স থাকতে হবে। আপনার বর্তমান ব্যালেন্স <strong className="text-purple-700 font-bold font-mono">৳ {balance.toFixed(1)}</strong>। বিকাশ বা নগদে টাকা পাঠিয়ে TrxID দিয়ে নিশ্চিত করলেই সেবাটি সাথে সাথে পেয়ে যাবেন।
+                          সার্ভার কপি, জন্ম নিবন্ধন, স্মার্ট আইডি, সিম ভেরিফিকেশন সহ যেকোনো ডিজিটাল সেবা পেতে আপনার একটি সক্রিয় অ্যাকাউন্ট এবং প্রয়োজনীয় ব্যালেন্স থাকতে হবে। আপনার বর্তমান ব্যালেন্স <strong className="text-purple-700 font-bold font-mono">৳ {balance.toFixed(1)}</strong>। বিকাশ বা নগদে টাকা পাঠিয়ে TrxID দিয়ে নিশ্চিত করলেই সেবাটি সাথে সাথে পেয়ে যাবেন।
                         </p>
 
                         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-700">
                           <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                            ১. বিকাশ/নগদে টাকা পাঠান
+                            ১. বিনামূল্যে রেজিস্ট্রেশন করুন
                           </span>
                           <span className="text-slate-400">→</span>
                           <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
                             <span className="w-2 h-2 rounded-full bg-purple-500" />
-                            ২. TrxID লিখে সাবমিট করুন
+                            ২. বিকাশ/নগদে টাকা পাঠান
                           </span>
                           <span className="text-slate-400">→</span>
                           <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
@@ -634,18 +788,30 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsWalletViewActive(true);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <CreditCard className="w-4 h-4 text-amber-300" />
-                        <span>এখনই ব্যালেন্স অ্যাড করুন</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      {currentUser.isGuest ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsAuthModalOpen(true)}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <UserCheck className="w-4 h-4 text-amber-300" />
+                          <span>এখনই রেজিস্ট্রেশন করুন</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsWalletViewActive(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <CreditCard className="w-4 h-4 text-amber-300" />
+                          <span>এখনই ব্যালেন্স অ্যাড করুন</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -929,9 +1095,14 @@ export default function App() {
                             </p>
                           </div>
                           
-                          {/* Card action button with clear balance alert */}
+                          {/* Card action button with clear status */}
                           <div className="pt-3.5 border-t border-purple-50/75 mt-4 flex items-center justify-between text-[11px] font-extrabold text-purple-700 group-hover:text-purple-950 transition-colors">
-                            {needsRecharge ? (
+                            {currentUser.isGuest ? (
+                              <span className="flex items-center gap-1.5 font-bold text-indigo-700">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                <span>রেজিস্ট্রেশন করুন • সেবা চালু করুন</span>
+                              </span>
+                            ) : needsRecharge ? (
                               <span className="flex items-center gap-1.5 font-bold text-amber-700">
                                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                                 <span>ব্যালেন্স লাগবে • চালু করুন (ফি: ৳ {currentFee})</span>
@@ -958,7 +1129,7 @@ export default function App() {
        )}
       </main>
 
-      {/* FOOTER */}
+      {/* FOOTER (With WhatsApp Support Button) */}
       <footer className="mt-28 relative overflow-hidden rounded-t-[3rem] border-t border-purple-100 bg-white shadow-[0_-20px_50px_rgba(124,58,237,0.03)]">
         <div className="absolute top-0 left-0 right-0 h-[5px] bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500" />
         
@@ -1031,13 +1202,24 @@ export default function App() {
                   <span>SYSTEM OPERATIONAL (AUTO-SECURE)</span>
                 </div>
 
+                {/* 🟢 FOOTER WHATSAPP BUTTON (Retained as requested) */}
                 <a
-                  href="https://wa.me/message/5GS3DHNNX6PSM1"
+                  href={WHATSAPP_LINK}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-center justify-center gap-3 w-full max-w-[240px] px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-extrabold text-xs shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 cursor-pointer overflow-hidden mt-1 md:self-start"
+                  className="group relative flex items-center justify-center gap-2.5 w-full max-w-[240px] px-5 py-3 rounded-full bg-[#00c853] hover:bg-[#00b34a] text-white font-extrabold text-xs shadow-md shadow-emerald-500/15 hover:shadow-lg hover:shadow-emerald-500/25 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 cursor-pointer overflow-hidden mt-1 md:self-start"
                   style={{ textDecoration: "none" }}
                 >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="currentColor" 
+                    className="text-white group-hover:rotate-12 transition-transform duration-300 shrink-0"
+                  >
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.88-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.347-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.876 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                  </svg>
                   <span>WhatsApp এ মেসেজ দিন</span>
                 </a>
               </div>
