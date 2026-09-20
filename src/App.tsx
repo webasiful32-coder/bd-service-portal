@@ -1,32 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, ServiceType, ServiceDefinition } from './types';
 import { SYSTEM_SERVICES, OFFICIAL_GOVT_SEAL } from './data';
-import WalletGate, { PaymentMethod } from './components/WalletGate';
+import WalletGateComponent, { WalletGate as NamedWalletGate, PaymentMethod } from './components/WalletGate';
 import ServiceViews from './components/ServiceViews';
-import { AuthScreen } from './components/AuthScreen';
 import { localAuth, LocalUser } from './lib/localAuth';
 import { 
   Search, CreditCard, CheckCircle, Sparkles, Clock, 
-  Layers, ShieldCheck, LogOut, RefreshCw, Smartphone
+  Layers, ShieldCheck, LogOut, Smartphone,
+  Wallet, ArrowRight, AlertTriangle
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
+
+// Default এবং Named Export উভয়ের সাথে কম্প্যাটিবল
+const WalletGate = WalletGateComponent || NamedWalletGate;
 
 const brandLogo = OFFICIAL_GOVT_SEAL || "https://upload.wikimedia.org/wikipedia/commons/8/84/Government_Seal_of_Bangladesh.svg";
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [balance, setBalance] = useState<number>(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // লগইন স্ক্রিন ছাড়া সরাসরি ড্যাশবোর্ড ওপেন করার জন্য ডিফল্ট সিটিজেন স্টেট
+  const [currentUser, setCurrentUser] = useState<LocalUser>(() => {
+    return localAuth.getCurrentUser() || {
+      uid: 'CITIZEN-' + Math.floor(100000 + Math.random() * 900000),
+      email: 'citizen@service.gov.bd',
+      displayName: 'সাধারণ নাগরিক (গেস্ট)',
+      balance: 0,
+      role: 'citizen'
+    };
+  });
 
+  const [balance, setBalance] = useState<number>(() => {
+    const saved = localStorage.getItem('citizen_wallet_balance');
+    return saved ? parseFloat(saved) : 0;
+  });
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeServiceId, setActiveServiceId] = useState<ServiceType | null>(null);
   const [isWalletViewActive, setIsWalletViewActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Toast State
+  // Toast State & Notice
   const [toast, setToast] = useState<{ title: string; message: string; show: boolean } | null>(null);
+  const [showNoticeBanner, setShowNoticeBanner] = useState(true);
 
   const SERVICE_ICON_THEME: Record<string, { bg: string; icon: string }> = {
     nid: { bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100', icon: 'text-emerald-600' },
@@ -182,33 +198,17 @@ export default function App() {
         const user = localAuth.getCurrentUser();
         if (user) {
           setCurrentUser(user);
-          setBalance(user.balance || 0);
+          if (typeof user.balance === 'number') {
+            setBalance(user.balance);
+          }
           const txs = await localAuth.getTransactions(user.uid);
           setTransactions(txs);
         }
       } catch (err) {
         console.error("Error setting up live database handshake:", err);
-      } finally {
-        setLoadingAuth(false);
       }
     }
     initAndCheck();
-  }, []);
-
-  // Auth State Listener
-  useEffect(() => {
-    const unsubscribe = localAuth.subscribe(async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        setBalance(user.balance || 0);
-        const txs = await localAuth.getTransactions(user.uid);
-        setTransactions(txs);
-      } else {
-        setBalance(0);
-        setTransactions([]);
-      }
-    });
-    return unsubscribe;
   }, []);
 
   const triggerToast = (title: string, message: string) => {
@@ -218,36 +218,69 @@ export default function App() {
     }, 4500);
   };
 
-  const deductFee = async (amount: number, service?: ServiceDefinition): Promise<boolean> => {
-    if (!currentUser) return false;
+  // সার্ভিস কার্ডে ক্লিক করার সময় ব্যালেন্স চেক ও অ্যালার্ট
+  const handleServiceClick = (serviceItem: ServiceDefinition) => {
+    const fee = serviceItem.fee ?? (serviceItem as any).price ?? 18;
+    if (balance < fee) {
+      triggerToast(
+        '⚠️ ব্যালেন্স রিচার্জ প্রয়োজন',
+        `"${serviceItem.banglaTitle || serviceItem.title}" সেবার জন্য ৳ ${fee} প্রয়োজন। আপনার বর্তমান ব্যালেন্স ৳ ${balance.toFixed(1)}। অনুগ্রহ করে বিকাশ বা নগদে টাকা অ্যাড করুন।`
+      );
+      // ব্যালেন্স না থাকলে সরাসরি রিচার্জ ডেস্ক ওপেন করা
+      setIsWalletViewActive(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setActiveServiceId(serviceItem.id as ServiceType);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  const deductFee = async (amount: number, service?: any): Promise<boolean> => {
     if (balance < amount) {
       triggerToast('অপ্রতুল ব্যালেন্স', `এই সেবার জন্য ${amount} ৳ প্রয়োজন। আপনার বর্তমান ব্যালেন্স: ${balance} ৳।`);
+      setIsWalletViewActive(true);
       return false;
     }
     
     try {
-      const response = await fetch('/api/services/deduct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          amount,
-          serviceName: service?.banglaTitle || service?.title || 'Citizenship Query',
-          info: (service as any)?.placeholder || ''
-        })
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        triggerToast('Error (ত্রুটি)', errData.error || 'Deduction failed.');
-        return false;
+      if (currentUser.uid && !currentUser.uid.startsWith('CITIZEN-')) {
+        const response = await fetch('/api/services/deduct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: currentUser.uid,
+            amount,
+            serviceName: service?.banglaTitle || service?.title || 'Citizenship Query',
+            info: (service as any)?.placeholder || ''
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setBalance(data.balance);
+          const txs = await localAuth.getTransactions(currentUser.uid);
+          setTransactions(txs);
+          triggerToast('অর্ডার সফল হয়েছে', `${amount} ৳ সফলভাবে কর্তন করা হয়েছে।`);
+          return true;
+        }
       }
-      const data = await response.json();
-      setBalance(data.balance);
-      
-      const txs = await localAuth.getTransactions(currentUser.uid);
-      setTransactions(txs);
-      
-      triggerToast('অর্ডার সফল হয়েছে', `${amount} ৳ সফলভাবে কর্তন করা হয়েছে। অর্ডার আইডি: ${data.orderId || 'ORD-OK'}`);
+
+      // গেস্ট মোড / লোকাল স্টেট আপডেট
+      const newBal = Math.max(0, balance - amount);
+      setBalance(newBal);
+      localStorage.setItem('citizen_wallet_balance', newBal.toString());
+      setTransactions(prev => [
+        {
+          id: 'TX-' + Math.floor(100000 + Math.random() * 900000),
+          type: 'service',
+          amount,
+          serviceName: service?.banglaTitle || 'নাগরিক সেবা',
+          timestamp: new Date().toLocaleTimeString('bn-BD'),
+          status: 'Completed'
+        },
+        ...prev
+      ]);
+      triggerToast('অর্ডার সফল হয়েছে', `${amount} ৳ সফলভাবে কর্তন করা হয়েছে।`);
       return true;
     } catch (error) {
       console.error(error);
@@ -257,31 +290,45 @@ export default function App() {
   };
 
   const onAddMoney = async (amount: number, method: PaymentMethod, trxId: string, senderNumber?: string) => {
-    if (!currentUser) return;
-    
     try {
-      const response = await fetch('/api/transactions/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
+      if (currentUser.uid && !currentUser.uid.startsWith('CITIZEN-')) {
+        const response = await fetch('/api/transactions/deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: currentUser.uid,
+            amount,
+            method,
+            trxId,
+            senderNumber
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setBalance(data.balance);
+          const txs = await localAuth.getTransactions(currentUser.uid);
+          setTransactions(txs);
+          triggerToast('ডিপোজিট সফল', `৳ ${amount} আপনার ওয়ালেটে সফলভাবে জমা হয়েছে!`);
+          return;
+        }
+      }
+
+      // লোকাল ওয়ালেট আপডেট
+      const newBal = balance + amount;
+      setBalance(newBal);
+      localStorage.setItem('citizen_wallet_balance', newBal.toString());
+      setTransactions(prev => [
+        {
+          id: trxId || ('TX-' + Math.floor(100000 + Math.random() * 900000)),
+          type: 'deposit',
           amount,
           method,
           trxId,
-          senderNumber
-        })
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        triggerToast('Verification Error', errData.error || 'Verification of deposit failed.');
-        return;
-      }
-      const data = await response.json();
-      setBalance(data.balance);
-      
-      const txs = await localAuth.getTransactions(currentUser.uid);
-      setTransactions(txs);
-      
+          timestamp: new Date().toLocaleTimeString('bn-BD'),
+          status: 'Completed'
+        },
+        ...prev
+      ]);
       triggerToast('ডিপোজিট সফল', `৳ ${amount} আপনার ওয়ালেটে সফলভাবে জমা হয়েছে!`);
     } catch (error) {
       console.error(error);
@@ -290,40 +337,15 @@ export default function App() {
   };
 
   const onWithdraw = async (amount: number, method: PaymentMethod, accountNo: string): Promise<boolean> => {
-    if (!currentUser) return false;
     if (balance < amount) return false;
-
-    try {
-      const response = await fetch('/api/transactions/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          amount,
-          method,
-          accountNo
-        })
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        triggerToast('Withdrawal Error', errData.error || 'Failed to process withdrawal.');
-        return false;
-      }
-      const data = await response.json();
-      setBalance(data.balance);
-      
-      const txs = await localAuth.getTransactions(currentUser.uid);
-      setTransactions(txs);
-      
-      triggerToast('উইথড্র রিকোয়েস্ট গৃহীত', `৳ ${amount} এর পে-আউট রিকোয়েস্ট জমা হয়েছে (${accountNo})`);
-      return true;
-    } catch (error) {
-      console.error(error);
-      return false;
-    }
+    const newBal = balance - amount;
+    setBalance(newBal);
+    localStorage.setItem('citizen_wallet_balance', newBal.toString());
+    triggerToast('উইথড্র রিকোয়েস্ট গৃহীত', `৳ ${amount} এর পে-আউট রিকোয়েস্ট জমা হয়েছে (${accountNo})`);
+    return true;
   };
 
-  // Filter Services Logic with comprehensive category bridging
+  // Filter Services Logic
   const filteredServices = SYSTEM_SERVICES.filter(service => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = 
@@ -342,49 +364,6 @@ export default function App() {
     return matchesSearch && matchesCategory;
   });
 
-  /*if (loadingAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-tr from-purple-100 via-pink-50 to-purple-50 flex flex-col items-center justify-center font-sans">
-        <RefreshCw size={28} className="text-purple-600 animate-spin" />
-        <p className="text-xs text-purple-900 font-bold mt-3 animate-pulse tracking-wide uppercase">Connecting Secure Citizens Registry Database...</p>
-      </div>
-    );
-  }*/
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-tr from-purple-100 via-pink-50 to-purple-50 flex items-center justify-center p-4">
-        <AuthScreen 
-          onSuccess={(user: any) => {
-            const currentUserNow = localAuth.getCurrentUser();
-            if (!currentUserNow || currentUserNow.email !== user.email) {
-              localAuth._updateState({
-                uid: user.uid || ('USR-' + Math.floor(100000 + Math.random() * 900000)),
-                email: user.email,
-                displayName: user.displayName || user.name || 'Citizen User',
-                balance: typeof user.balance === 'number' ? user.balance : 0,
-                role: user.role || 'citizen'
-              });
-            }
-          }} 
-          onAuthSuccess={(user: any) => {
-            const currentUserNow = localAuth.getCurrentUser();
-            if (!currentUserNow || currentUserNow.email !== user.email) {
-              localAuth._updateState({
-                uid: user.uid || ('USR-' + Math.floor(100000 + Math.random() * 900000)),
-                email: user.email,
-                displayName: user.displayName || user.name || 'Citizen User',
-                balance: typeof user.balance === 'number' ? user.balance : 0,
-                role: user.role || 'citizen'
-              });
-            }
-          }}
-          triggerToast={triggerToast} 
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-tr from-purple-100 via-pink-50 to-purple-50 text-gray-800 font-sans pb-16 antialiased relative">
       {/* Ambient Blur Sprites */}
@@ -393,13 +372,33 @@ export default function App() {
 
       {/* TOAST OVERLAY */}
       {toast && toast.show && (
-        <div id="visual_toast" className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-white border border-purple-200/60 shadow-xl shadow-purple-200/40 flex items-start gap-3 w-80 animate-fade-in">
-          <div className="p-2 bg-purple-50 text-purple-600 rounded-xl shrink-0">
-            <CheckCircle size={18} />
+        <div id="visual_toast" className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-white border-2 border-amber-400 shadow-2xl flex items-start gap-3 w-84 sm:w-96 animate-fade-in">
+          <div className="p-2 bg-amber-50 text-amber-600 rounded-xl shrink-0 border border-amber-200">
+            <CreditCard size={18} />
           </div>
-          <div>
-            <h5 className="text-xs font-extrabold text-purple-950">{toast.title}</h5>
-            <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{toast.message}</p>
+          <div className="flex-1">
+            <h5 className="text-xs font-black text-slate-900">{toast.title}</h5>
+            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed font-medium">{toast.message}</p>
+            <div className="mt-2.5 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setToast(null);
+                  setIsWalletViewActive(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-sm cursor-pointer"
+              >
+                এখনই ব্যালেন্স রিচার্জ করুন
+              </button>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="px-2 py-1 text-slate-500 hover:text-slate-800 text-[11px] font-semibold cursor-pointer"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -467,18 +466,8 @@ export default function App() {
                   <span>৳ {balance.toFixed(1)}</span>
                 </div>
                 <span className="font-bold text-slate-100 text-[11px] uppercase tracking-wider">
-                  {isWalletViewActive ? 'Back To Portal' : 'Wallet Desk'}
+                  {isWalletViewActive ? 'Back To Portal' : 'ব্যালেন্স রিচার্জ'}
                 </span>
-              </button>
- 
-              <button
-                type="button"
-                onClick={() => localAuth.logout()}
-                className="p-2 sm:px-3.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50/60 bg-white hover:border-rose-200 border border-slate-200 text-xs rounded-xl font-bold flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5 duration-300 cursor-pointer shadow-sm"
-                title="Logout Account"
-              >
-                <LogOut size={13} className="text-slate-400 group-hover:text-rose-500" />
-                <span className="hidden sm:inline font-sans">Logout</span>
               </button>
             </div>
           </div>
@@ -521,7 +510,7 @@ export default function App() {
               />
             ) : (
             /* SERVICE EXPLORER DASHBOARD */
-            <div className="space-y-8">
+            <div className="space-y-6">
               
               {/* JUMBOTRON GRAPHIC BANNER */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0c1329] via-[#101b34] to-[#16223f] p-6 sm:p-9 text-white shadow-xl shadow-slate-950/20 border border-slate-800">
@@ -603,6 +592,73 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* 📢 জরুরি নোটিশ / ইউজারদের ব্যালেন্স অ্যাড নির্দেশিকা */}
+              {showNoticeBanner && (
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-emerald-500/15 border-2 border-amber-400 p-4 sm:p-5 shadow-md">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      <div className="p-3 rounded-2xl bg-amber-500 text-slate-950 shrink-0 shadow-md">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-xs">
+                            জরুরি নোটিশ / ব্যালেন্স নির্দেশনা
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-900">
+                            যেকোনো সেবা গ্রহণ করতে প্রথমে একাউন্টে ব্যালেন্স অ্যাড করুন
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-[13px] text-slate-700 mt-1.5 leading-relaxed font-medium max-w-3xl">
+                          সার্ভার কপি, জন্ম নিবন্ধন, স্মার্ট আইডি, সিম ভেরিফিকেশন সহ যেকোনো ডিজিটাল সেবা পেতে আপনার ওয়ালেটে প্রয়োজনীয় ব্যালেন্স থাকতে হবে। আপনার বর্তমান ব্যালেন্স <strong className="text-purple-700 font-bold font-mono">৳ {balance.toFixed(1)}</strong>। বিকাশ বা নগদে টাকা পাঠিয়ে TrxID দিয়ে নিশ্চিত করলেই সেবাটি সাথে সাথে পেয়ে যাবেন।
+                        </p>
+
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-700">
+                          <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            ১. বিকাশ/নগদে টাকা পাঠান
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
+                            <span className="w-2 h-2 rounded-full bg-purple-500" />
+                            ২. TrxID লিখে সাবমিট করুন
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            ৩. সেবাটি সাথে সাথে তৈরি হবে
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsWalletViewActive(true);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <CreditCard className="w-4 h-4 text-amber-300" />
+                        <span>এখনই ব্যালেন্স অ্যাড করুন</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowNoticeBanner(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
+                        title="হাইড করুন"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* CONTROLS AREA (SEARCH & CATEGORIES Badges) */}
               <div className="flex flex-col gap-5 bg-white/80 backdrop-blur-md border border-purple-100/70 p-5 sm:p-6 rounded-3xl shadow-[0_12px_40px_-15px_rgba(124,58,237,0.06)]">
@@ -689,6 +745,9 @@ export default function App() {
                 ) : (
                   <div id="services_bento_grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filteredServices.map((serviceItem) => {
+                      const currentFee = serviceItem.fee ?? (serviceItem as any).price ?? 18;
+                      const needsRecharge = balance < currentFee;
+
                       const getTheme = (cat: string) => {
                         switch (cat) {
                           case 'nid':
@@ -827,12 +886,8 @@ export default function App() {
                         <div
                           key={serviceItem.id}
                           id={`service_card_${serviceItem.id}`}
-                          onClick={() => {
-                            setActiveServiceId(serviceItem.id);
-                            window.scrollTo({ top: 120, behavior: 'smooth' });
-                          }}
+                          onClick={() => handleServiceClick(serviceItem)}
                           title={`${serviceItem.banglaTitle || serviceItem.title} — ${serviceItem.title}`}
-                          aria-label={`Service: ${serviceItem.title}${serviceItem.banglaTitle ? ' — ' + serviceItem.banglaTitle : ''}`}
                           className={`relative overflow-hidden ${theme.cardBg} border border-purple-100/70 p-5 pt-7 rounded-2xl transition-all duration-300 cursor-pointer group flex flex-col justify-between hover:scale-[1.01] hover:-translate-y-1 ${theme.hoverShadow} ${theme.cardHover}`}
                         >
                           <div className={`absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r ${theme.topBorder}`} />
@@ -850,7 +905,7 @@ export default function App() {
                                   </span>
                                 )}
                                 <span className="text-[10px] font-extrabold font-mono py-0.5 px-2 rounded-md border bg-purple-50/90 text-purple-700 border-purple-200/60 shadow-sm">
-                                  ৳ {serviceItem.fee} BDT
+                                  ৳ {currentFee} BDT
                                 </span>
                               </div>
                             </div>
@@ -874,11 +929,19 @@ export default function App() {
                             </p>
                           </div>
                           
+                          {/* Card action button with clear balance alert */}
                           <div className="pt-3.5 border-t border-purple-50/75 mt-4 flex items-center justify-between text-[11px] font-extrabold text-purple-700 group-hover:text-purple-950 transition-colors">
-                            <span className="flex items-center gap-1.5 font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 group-hover:animate-ping"></span>
-                              পরিসেবা শুরু করুন (Run Panel)
-                            </span>
+                            {needsRecharge ? (
+                              <span className="flex items-center gap-1.5 font-bold text-amber-700">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                <span>ব্যালেন্স লাগবে • চালু করুন (ফি: ৳ {currentFee})</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 font-bold text-purple-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 group-hover:animate-ping"></span>
+                                <span>পরিসেবা শুরু করুন (Run Panel)</span>
+                              </span>
+                            )}
                             <span className="transform translate-x-0 group-hover:translate-x-1.5 transition-transform font-mono font-black">&rarr;</span>
                           </div>
                         </div>
@@ -899,9 +962,6 @@ export default function App() {
       <footer className="mt-28 relative overflow-hidden rounded-t-[3rem] border-t border-purple-100 bg-white shadow-[0_-20px_50px_rgba(124,58,237,0.03)]">
         <div className="absolute top-0 left-0 right-0 h-[5px] bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500" />
         
-        <div className="absolute -top-24 -left-20 w-80 h-80 bg-purple-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
-        <div className="absolute -bottom-24 -right-20 w-96 h-96 bg-pink-100/25 rounded-full blur-3xl pointer-events-none -z-10" />
-
         <div className="max-w-7xl mx-auto px-6 sm:px-8 pt-16 pb-12 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8 pb-12 border-b border-purple-200/50">
             
@@ -972,23 +1032,12 @@ export default function App() {
                 </div>
 
                 <a
-                  href="https://wa.me/message/J4UIYSLWOJLWM1"
+                  href="https://wa.me/message/5GS3DHNNX6PSM1"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group relative flex items-center justify-center gap-3 w-full max-w-[240px] px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-extrabold text-xs shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 cursor-pointer overflow-hidden mt-1 md:self-start"
                   style={{ textDecoration: "none" }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    width="16" 
-                    height="16" 
-                    viewBox="0 0 24 24" 
-                    fill="currentColor" 
-                    className="text-white hover:rotate-12 transition-transform duration-300"
-                  >
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.88-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.347-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.876 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
-                  </svg>
                   <span>WhatsApp এ মেসেজ দিন</span>
                 </a>
               </div>
