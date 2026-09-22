@@ -56,7 +56,7 @@ export function WalletGate({ balance, transactions, onAddMoney, onWithdraw, onRe
 
   // Merchants numbers simulation
   const MERCHANT_NUMBERS = {
-    bKash: 'বিকাশ লেনদেন সাময়িকভাবে স্থগিত ',
+    bKash: '01617137102',
     Nagad: '01628329062',
   };
 
