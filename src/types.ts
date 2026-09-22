@@ -3,13 +3,16 @@ export type ServiceCategory =
   | 'nid'
   | 'birth'
   | 'birth_death'
+  | 'tin'
   | 'tax'
   | 'tax_tin'
+  | 'sim'
   | 'mobile'
   | 'telecom'
   | 'location'
   | 'cert'
   | 'certificate'
+  | 'passport'
   | 'land'
   | 'education'
   | 'trade'
@@ -19,26 +22,63 @@ export type ServiceCategory =
 
 export type ServiceType = string;
 
+export interface ServiceField {
+  id: string;
+  label: string;
+  placeholder: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'file';
+  options?: string[];
+  required?: boolean;
+}
+
 export interface ServiceDefinition {
   id: ServiceType;
   title: string;
-  banglaTitle: string;
-  category: string;
+  banglaTitle?: string;
+  titleEn?: string;          // <--- optional করা হয়েছে
+  category: ServiceCategory;
   description: string;
-  fee: number;
-  icon?: string;
+  fee?: number;
+  price: number;
+  icon?: string;             // <--- ইমোজি আইকন সাপোর্ট
+  iconType?: string;         // <--- optional করা হয়েছে যাতে এরর না আসে
   iconName?: string;
   color?: string;
-  titleEn?: string;
   popular?: boolean;
+  isPopular?: boolean;
+  tag?: string;
+  deliveryTime?: string;     // <--- ৩ দিন সময় বা ২৪ ঘণ্টা অনলাইন ব্যাজ
+  processingTime?: string;
+  badge?: string;
   inputLabel?: string;
   inputPlaceholder?: string;
   placeholder?: string;
-  price?: number;
+  fields?: ServiceField[];
   [key: string]: any;
 }
 
 export type ServiceItem = ServiceDefinition;
+
+export interface UserAccount {
+  username: string;
+  displayName: string;
+  phone?: string;
+  email?: string;
+  walletBalance: number;
+  isVerified: boolean;
+  isGuest: boolean;
+  rechargeHistory: WalletRechargeRecord[];
+}
+
+export interface WalletRechargeRecord {
+  id: string;
+  method: 'bkash' | 'nagad' | 'rocket' | 'upay';
+  amount: number;
+  senderNumber: string;
+  trxId: string;
+  timestamp: string;
+  status: 'completed' | 'pending' | 'failed';
+}
 
 export interface Transaction {
   id: string;
@@ -50,6 +90,22 @@ export interface Transaction {
   accountNo?: string;
   status: 'Completed' | 'Pending' | 'Rejected' | string;
   timestamp: string;
+}
+
+export interface OrderItem {
+  id: string;
+  serviceId: string;
+  serviceTitle: string;
+  serviceBanglaTitle: string;
+  info: string;
+  details?: Record<string, string>;
+  files?: string[];
+  fee: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  createdAt: string;
+  deliveryTime?: string;
+  completedAt?: string;
+  deliveryNote?: string;
 }
 
 export interface BirthCertificateInput {
@@ -122,7 +178,6 @@ export interface DeviceLockState {
   isLockedSimulation: boolean;
 }
 
-// --- ব্যবসা ও সার্টিফিকেশন ইন্টারফেস ---
 export interface BusinessInput {
   businessName: string;
   ownerName: string;
@@ -136,10 +191,9 @@ export interface CertificationInput {
   fullName: string;
   permanentAddress: string;
   referenceNo?: string;
-  educationDetails?: string; // SSC/HSC এর জন্য
+  educationDetails?: string;
 }
 
-// --- ইউটিলিটি ও সাধারণ সেবা ---
 export interface UtilityBillInput {
   consumerNo: string;
   billMonth: string;
@@ -164,19 +218,6 @@ export interface MarriageCertInput {
   kaziOfficeName: string;
 }
 
-export interface OrderItem {
-  id: string;
-  serviceId: string;
-  serviceTitle: string;
-  serviceBanglaTitle: string;
-  info: string;
-  fee: number;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
-  createdAt: string;
-  completedAt?: string;
-  deliveryNote?: string;
-}
-
 export interface WalletTransaction {
   id: string;
   type: 'debit' | 'credit';
@@ -191,4 +232,25 @@ export interface UserProfile {
   email: string;
   phone: string;
   balance: number;
+}
+
+export interface GeneratedDocData {
+  serviceId: string;
+  serviceTitle: string;
+  fullNameBn: string;
+  fullNameEn: string;
+  nidNumber?: string;
+  dob?: string;
+  fatherName?: string;
+  motherName?: string;
+  gender?: string;
+  bloodGroup?: string;
+  address?: string;
+  qrCodeUrl?: string;
+  barcode?: string;
+  issuedDate: string;
+  trackingId: string;
+  operatorName?: string;
+  simNumber?: string;
+  photoUrl?: string;
 }

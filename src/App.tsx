@@ -89,6 +89,11 @@ export default function App() {
       'sign-copy': 'Feather',
       'official_server_copy': 'ShieldAlert',
       'official-server-copy': 'ShieldAlert',
+      // আইডি কার্ড সংশোধনের আইকনসমূহ
+      'nid-full-name-correction': 'Sliders',
+      'nid-age-correction': 'Calendar',
+      'nid-partial-name-correction': 'PenTool',
+      'nid-address-transfer': 'Compass',
       'nid_correction': 'Sliders',
       'nid-correction': 'Sliders',
       'nid_address_change': 'Compass',
@@ -97,6 +102,7 @@ export default function App() {
       'smart-id-card': 'Sparkles',
       'auto_birth': 'FileCheck',
       'new-birth-reg': 'FileCheck',
+      'new-birth-registration': 'FileCheck',
       'information_correction': 'SearchCheck',
       'birth-copy': 'SearchCheck',
       'birth_correction': 'PenTool',
@@ -384,12 +390,13 @@ export default function App() {
     triggerToast('স্বাগতম', `${user.displayName || user.name || user.email}, আপনার একাউন্ট সফলভাবে সক্রিয় হয়েছে!`);
   };
 
-  // Filter Services Logic
+  // Filter Services Logic (Safely checking title, banglaTitle, titleEn, description)
   const filteredServices = SYSTEM_SERVICES.filter(service => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = 
       (service.title || '').toLowerCase().includes(q) || 
       (service.banglaTitle || '').includes(q) ||
+      (service.titleEn || '').toLowerCase().includes(q) ||
       (service.description || '').toLowerCase().includes(q);
 
     const matchesCategory = selectedCategory === 'all' || 
@@ -464,7 +471,7 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER DESK NAVIGATION BAR (Matching Screenshot 2 with WhatsApp Button) */}
+      {/* HEADER DESK NAVIGATION BAR */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row justify-between items-center gap-3.5">
           
@@ -511,7 +518,7 @@ export default function App() {
               <span>{currentTime.toLocaleTimeString()}</span>
             </div>
 
-            {/* 🟢 HEADER WHATSAPP BUTTON (Matching Screenshot 1 & 2) */}
+            {/* 🟢 HEADER WHATSAPP BUTTON */}
             <a
               href={WHATSAPP_LINK}
               target="_blank"
@@ -835,7 +842,7 @@ export default function App() {
                     <input
                       id="search_services_input"
                       type="search"
-                      placeholder="সার্ভিস খুঁজুন... (e.g. জন্ম নিবন্ধন, স্মার্ট আইডি)"
+                      placeholder="সার্ভিস খুঁজুন... (e.g. জন্ম নিবন্ধন, স্মার্ট আইডি, সংশোধন)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full bg-transparent rounded-2xl py-3 pl-11 pr-10 text-xs focus:outline-none font-medium placeholder-purple-400 text-purple-950"
@@ -1064,7 +1071,12 @@ export default function App() {
                                 {theme.label}
                               </span>
                               
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                {serviceItem.deliveryTime && (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-purple-100/90 text-purple-800 border border-purple-200">
+                                    ⏱️ {serviceItem.deliveryTime}
+                                  </span>
+                                )}
                                 {serviceItem.popular && (
                                   <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-md text-white bg-gradient-to-r ${theme.topBorder} uppercase tracking-wider shadow-sm`}>
                                     Popular
@@ -1078,7 +1090,7 @@ export default function App() {
 
                             <div className="flex items-center gap-3.5 mb-3.5 mt-2">
                               <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${theme.iconBg}`}>
-                                {renderServiceIcon((serviceItem as any)?.iconName || serviceItem.id, serviceItem.category, serviceItem.id)}
+                                {renderServiceIcon((serviceItem as any)?.iconName || (serviceItem as any)?.icon || serviceItem.id, serviceItem.category, serviceItem.id)}
                               </div>
                               <div>
                                 <h4 className={`font-black text-sm text-purple-950 font-sans tracking-tight leading-tight transition-colors ${theme.accentText}`}>
@@ -1202,7 +1214,7 @@ export default function App() {
                   <span>SYSTEM OPERATIONAL (AUTO-SECURE)</span>
                 </div>
 
-                {/* 🟢 FOOTER WHATSAPP BUTTON (Retained as requested) */}
+                {/* 🟢 FOOTER WHATSAPP BUTTON */}
                 <a
                   href={WHATSAPP_LINK}
                   target="_blank"
